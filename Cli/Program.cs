@@ -61,9 +61,6 @@ public static class Program
         // Get output language
         var outputLanguage = args.Skip(1).FirstOrDefault();
 
-        // Get the interval of translated lines until printing to file
-        var interval = args.Skip(2).FirstOrDefault();
-
         // Check if XML file is provided
         if (string.IsNullOrWhiteSpace(xmlFile))
         {
@@ -75,20 +72,6 @@ public static class Program
         if (string.IsNullOrWhiteSpace(outputLanguage))
         {
             Console.WriteLine("Please provide an output language.");
-            Environment.Exit(1);
-        }
-
-        // Check if interval is provided
-        if (string.IsNullOrWhiteSpace(interval))
-        {
-            Console.WriteLine("Please provide an interval.");
-            Environment.Exit(1);
-        }
-
-        // Check if interval is a number
-        if (!int.TryParse(interval, out _))
-        {
-            Console.WriteLine("The provided interval is not a number.");
             Environment.Exit(1);
         }
 
@@ -112,7 +95,7 @@ public static class Program
         }
 
         // Get the XML file
-        var xmlLines = File.ReadLines(xmlFile);
+        var xml = XElement.Parse(File.ReadAllText(xmlFile));
 
         // Get timestamp
         var timestamp = DateTime.Now.Ticks;
@@ -120,50 +103,31 @@ public static class Program
         // Translate the XML file
         var translatedLines = new List<string>();
 
-        foreach (var currentLine in xmlLines)
+        foreach (var currentElement in xml.Elements())
         {
-            // Check if current line is a multiple of interval
-            if (translatedLines.Count % int.Parse(interval) == 0)
+            // Check if the element has to be translated
+            if (currentElement.Name.LocalName == "entry")
             {
-                // Print the number of translated lines
-                Console.WriteLine($"Translated {translatedLines.Count} more lines...");
-
-                // Write the translated lines to the output file
-                File.AppendAllLines(Path.Combine(OutputDirectory, Path.GetFileNameWithoutExtension(xmlFile) + $"_{outputLanguage}_{timestamp}.xml"), translatedLines);
-
-                // Clear the translated lines
-                translatedLines.Clear();
-            }
-
-            // Check if the current line must be translated
-            if (currentLine.TrimStart().StartsWith("<entry key="))
-            {
-                // Parse the current line
-                XElement element = XElement.Parse(currentLine);
+                // If a multiple of 100 lines has been translated, print the ammount of translated lines
+                if (translatedLines.Count % 100 == 0)
+                    Console.WriteLine($"Translated {translatedLines.Count} lines.");
 
                 // Get the value
-                var value = element.Value;
-
-                // If value is empty, output the current line
-                if (string.IsNullOrEmpty(value))
-                {
-                    translatedLines.Add(currentLine);
-                    continue;
-                }
+                var value = currentElement.Value;
 
                 // Translate the value
                 var translatedValue = Translate(value, outputLanguage);
 
-                // Set the translated value
-                element.SetValue(translatedValue);
+                // Change the element value
+                currentElement.Value = translatedValue;
 
                 // Add the translated line
-                translatedLines.Add(element.ToString());
+                translatedLines.Add(currentElement.ToString());
             }
             else
             {
-                // Add the current line
-                translatedLines.Add(currentLine);
+                // Add the line as it is
+                translatedLines.Add(currentElement.ToString());
             }
         }
 
